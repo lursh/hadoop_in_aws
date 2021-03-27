@@ -1,0 +1,73 @@
+---
+# tasks file for hadoop_on_ec2_datanode
+##################################
+  - yum:
+      name: 'lvm*'
+      state: present
+  # create a vg
+  - name: create a volume group
+    community.general.lvg:
+      vg: "{{ vg_name }}"
+      pvs: /dev/xvdn
+      pvresize: yes
+  - name: create a lv
+    community.general.lvol:
+      vg: "{{ vg_name }}"
+      lv: "{{ lv_name }}"
+      size: "{{ lv_size }}"
+  - name: Unmount a mounted vol
+    mount:
+      path: "{{ item }}"
+      state: unmounted
+    ignore_errors: yes
+    loop: 
+      - "/dfol"
+      - "/dev/{{ vg_name }}/{{ lv_name }}/"
+      - "/dev/mapper/{{ vg_name }}-{{ lv_name }}"  
+  - name: partition
+    shell: "mkfs.ext4 /dev/{{ vg_name }}/{{ lv_name }}"
+
+##################################
+  - copy: 
+      src: jdk-8u171-linux-x64.rpm
+      dest: /jdk-8u171-linux-x64.rpm
+  - copy: 
+      src: hadoop-1.2.1-1.x86_64.rpm
+      dest: /hadoop-1.2.1-1.x86_64.rpm
+  - name: install jdk
+    shell: "rpm -i /jdk-8u171-linux-x64.rpm"
+    ignore_errors: yes
+  - name: install hadoop
+    shell: "rpm -i /hadoop-1.2.1-1.x86_64.rpm --force"
+    ignore_errors: yes
+  - name: delete dfol
+    file: 
+      path: /dfol
+      state: absent
+      force: yes
+  - name: create dfol
+    file: 
+      path: /dfol
+      state: directory
+    ###############
+  - name: Mount up device to label
+    mount:
+      path: /dfol
+      fstype: ext4
+      src: "/dev/{{ vg_name }}/{{ lv_name }}"
+      state: mounted
+  - name: copy the datanode's core-site.xml file
+    template:
+      src: "datanode_core-site.xml"
+      dest: /etc/hadoop/core-site.xml
+  - name: copy the datanode's hdfs-site.xml file
+    template:
+      src: "datanode_hdfs-site.xml"
+      dest: /etc/hadoop/hdfs-site.xml
+  - ansible.posix.selinux: 
+      state: permissive 
+      policy: targeted
+  - shell: "hadoop-daemon.sh stop datanode"
+    ignore_errors: yes
+  - shell: "hadoop-daemon.sh start datanode"
+

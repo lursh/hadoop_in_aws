@@ -1,0 +1,7 @@
+- hosts: localhost
+  vars_files:
+  - cred.yml
+  roles: 
+  - ec2_for_hadoop
+
+

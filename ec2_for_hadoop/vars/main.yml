@@ -1,0 +1,10 @@
+---
+# vars file for ec2_for_hadoop
+datanode_count_: 2
+image_: ami-0a9d27a9f4f5c0efc
+instance_type_: t2.micro
+key_name_: "key"
+ec2_region_: ap-south-1
+az_: ap-south-1a
+vpc_cidr_block_: 192.168.0.0/16
+subnet_cidr: 192.168.0.0/24

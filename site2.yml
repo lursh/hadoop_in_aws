@@ -1,0 +1,9 @@
+- hosts: tag_Name_master
+  become: yes
+  become_method: sudo
+  connection: ssh
+  remote_user: ec2-user
+  gather_facts: no 
+  roles: 
+  - hadoop_on_ec2_namenode
+

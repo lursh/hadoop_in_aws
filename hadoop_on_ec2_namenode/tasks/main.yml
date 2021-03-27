@@ -1,0 +1,36 @@
+---
+# tasks file for hadoop_on_ec2_namenode
+  - name: copy jdk.rpm to namenode
+    copy: 
+      src: jdk-8u171-linux-x64.rpm
+      dest: /jdk-8u171-linux-x64.rpm
+  - name: copy hadoop.rpm to namenode
+    copy: 
+      src: hadoop-1.2.1-1.x86_64.rpm
+      dest: /hadoop-1.2.1-1.x86_64.rpm
+  - name: installing 
+    shell: "rpm -i /jdk-8u171-linux-x64.rpm"
+    ignore_errors: yes
+  - shell: "rpm -i /hadoop-1.2.1-1.x86_64.rpm --force"
+    ignore_errors: yes
+  - file: 
+      path: /dfol
+      state: absent
+      force: yes
+  - file: 
+      path: /dfol
+      state: directory
+  - template:
+      src: "namenode_core-site.xml"
+      dest: /etc/hadoop/core-site.xml
+  - template:
+      src: "namenode_hdfs-site.xml"
+      dest: /etc/hadoop/hdfs-site.xml
+  - ansible.posix.selinux: 
+      state: permissive
+      policy: targeted
+  - shell: "hadoop-daemon.sh stop namenode"
+    ignore_errors: yes
+  - shell: "echo Y |sudo hadoop namenode -format"
+    ignore_errors: yes
+  - shell: "hadoop-daemon.sh start namenode"

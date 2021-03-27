@@ -1,0 +1,126 @@
+---
+# tasks file for ec2_for_hadoop
+# Launch ec2 instances
+  - name: create a vpc
+    amazon.aws.ec2_vpc_net:
+      aws_access_key: "{{ access_key }}"
+      aws_secret_key: "{{ secret_key }}"
+      cidr_block: "{{ vpc_cidr_block_ }}"
+      region: "{{ ec2_region_ }}"
+      name: "{{ vpc_cidr_block_ }}_Myvpc"
+      state: present
+    register: ec2_vpc_created
+################################
+  - name: Create internet gateway and attach it to the vpc.
+    community.aws.ec2_vpc_igw:
+      aws_access_key: "{{ access_key }}"
+      aws_secret_key: "{{ secret_key }}"
+      region: "{{ ec2_region_ }}"
+      vpc_id: "{{ ec2_vpc_created.vpc.id }}"
+      state: present
+    register: igw
+#################################
+  - name: Create a public subnet in the vpc
+    amazon.aws.ec2_vpc_subnet: 
+      aws_access_key: "{{ access_key }}"
+      aws_secret_key: "{{ secret_key }}"
+      state: present
+      vpc_id: "{{ ec2_vpc_created.vpc.id }}"
+      region: "{{ ec2_region_ }}"
+      cidr: "{{ subnet_cidr }}"
+      tags: 
+        Name: "{{ subnet_cidr }}_MySubnet"
+      az: "{{ az_ }}" 
+    register: subnet_created
+##################################
+  - name: Set up public subnet route table
+    community.aws.ec2_vpc_route_table: 
+      aws_access_key: "{{ access_key }}"
+      aws_secret_key: "{{ secret_key }}"
+      vpc_id: "{{ ec2_vpc_created.vpc.id }}"
+      region: "{{ ec2_region_ }}"
+      tags:
+        Name: Public
+      subnets:
+        - "{{ subnet_created.subnet.id }}"  
+      routes:
+        - dest: 0.0.0.0/0
+          gateway_id: "{{ igw.gateway_id }}"
+    register: public_route_table
+  #################################
+  - name: create SG
+    amazon.aws.ec2_group: 
+      name: "MyHadoopSG1"
+      description: sg with rule descriptions
+      aws_access_key: "{{ access_key }}"
+      aws_secret_key: "{{ secret_key }}"
+      region: "{{ ec2_region_ }}"
+      vpc_id: "{{ ec2_vpc_created.vpc.id }}"
+      rules:
+        - proto: all
+          ports:
+          - 22
+          - 9870
+          - 9871
+          - 80
+          - 8020
+          - 9000
+          - 9001
+          - 50070
+          - 50470
+          cidr_ip: 0.0.0.0/0
+          rule_desc: allow ssh on port 22
+    register: SG
+####################################
+  - name: launching an ec2 instance as name node
+    ec2: 
+      assign_public_ip: yes
+      aws_access_key: "{{ access_key }}"
+      aws_secret_key: "{{ secret_key }}"
+      count: 1
+      group_id: "{{ SG.group_id }}"
+      image: "{{ image_ }}"
+      instance_tags: 
+        node: master
+        Name: master
+      instance_type: "{{ instance_type_ }}"
+      key_name: "{{ key_name_ }}"
+      region: "{{ ec2_region_ }}"
+      vpc_subnet_id: "{{ subnet_created.subnet.id }}"
+      zone: "{{ az_ }}"
+    register: namenode
+####################################
+  - name: launching an ec2 instance as data node
+    ec2: 
+      assign_public_ip: yes
+      aws_access_key: "{{ access_key }}"
+      aws_secret_key: "{{ secret_key }}"
+      count: "{{ datanode_count_ }}"
+      group_id: "{{ SG.group_id }}"
+      image: "{{ image_ }}"
+      instance_tags: 
+        node: slave
+        Name: slave
+      instance_type: "{{ instance_type_ }}"
+      key_name: "{{ key_name_ }}"
+      region: "{{ ec2_region_ }}"
+      vpc_subnet_id: "{{ subnet_created.subnet.id }}"
+      zone: "{{ az_ }}"
+    register: datanode
+  - name: wait 
+    pause:
+      minutes: 1
+#####################################
+  - name: Create new volume using SSD storage
+    amazon.aws.ec2_vol: 
+      aws_access_key: "{{ access_key }}"
+      aws_secret_key: "{{ secret_key }}"    
+      volume_size: 1
+      volume_type: gp2
+      device_name: /dev/xvdn
+      region: "{{ ec2_region_ }}"
+      zone: "{{ az_ }}"
+      delete_on_termination: yes
+      instance: "{{ item.id }}"
+    loop: "{{ datanode.instances }}"
+    register: ec2_vol

@@ -1,0 +1,5 @@
+---
+# vars file for hadoop_on_ec2
+vg_name: my_vg
+lv_name: my_lv
+lv_size: 500M
